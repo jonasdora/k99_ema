@@ -83,5 +83,17 @@ list(
   #   name = rmse_glmm,
   #   command = sapply(all_glmms, function(x){})
   # )
-  # , tarchetypes::tar_render(manuscript, "manuscript/manuscript.Rmd", priority = 0) # Set priority to 0 to ensure the manuscript is rendered after other results are available
+  , tar_target(
+    name = tab_fits,
+    command = data.frame(
+      model = rep(sapply(all_formulas, name_variants), 3),
+      method = rep(c("forest", "tree", "glmm"), each = 3),
+      rmse = c(
+        rmse_forests,
+        rmse_trees,
+        rep(NA, 3)
+      )
+    )
+  )
+  , tarchetypes::tar_render(manuscript, "manuscript/manuscript.Rmd", priority = 0) # Set priority to 0 to ensure the manuscript is rendered after other results are available
 )

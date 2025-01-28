@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(targets)
 tar_config_set(store = "../_targets")
-tar_load(model)
+tar_load(tab_fits)
 # You can interact with tar objects as usual, e.g.:
 # print(model)
 ```
@@ -27,27 +27,8 @@ This manuscript uses the Workflow for Open Reproducible Code in Science [@vanlis
 
 This is an example of a non-essential citation [@@vanlissaWORCSWorkflowOpen2021]. If you change the rendering function to `worcs::cite_essential`, it will be removed.
 
-<!--The function below inserts a notification if the manuscript is knit using synthetic data. Make sure to insert it after load_data().-->
-`r notify_synthetic()`
 
-## GitHub Documents
-
-This is an R Markdown format used for publishing markdown documents to GitHub. When you click the **Knit** button all R code chunks are run and a markdown file (.md) suitable for publishing to GitHub is generated.
-
-## Including Code
-
-You can include R code in the document as follows:
-
-```{r cars}
-summary(cars)
+```{r tabfit}
+knitr::kable(tab_fits)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
