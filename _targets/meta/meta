@@ -1,0 +1,26 @@
+name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
+.Random.seed|object|9d132b75b69d8050|||||||||||||||
+all_forests|stem|9025726a8878d033|cf627227644c6676|72166f6238f8b02f|2103571160||t20116.6203561345s|6e610f2e4fb3e9e3|4985691|rds|local|vector|||183.69||
+all_formulas|stem|65c350a2c1f54406|8d75f02262124022|e41a12c714edb92c|1829375974||t20116.5144865573s|ca97d2d9ee884e84|38243|rds|local|vector|||0.04||
+all_glmms|stem|c44b63f61b58de2e|5ae92be5f5d1559b|7c20d9a0fc0ba4f8|1457350633||t20116.531075789s|26fa62fb86206e6f|4124|rds|local|vector|||1200.21|Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back. Random slopes are not standardized back|
+all_trees|stem|de51c29edf5019db|f1f6ea9d29ece250|89f485027e2830dc|881982070||t20116.6204390166s|e646742cb75892b3|2301907|rds|local|vector|||6.86||
+create_folds|function|c464129bb241f6e3|||||||||||||||
+data|stem|21f77354c2edfe08|43e69dac68c1574d|2c530c1562a7fbd1|33550471||t20116.2988129993s|88c4bcb2da4f4543|358557|rds|local|vector|||2.95||
+data_filtered|stem|8023c956c4e1237c|3ad02225ab51b219|8f0254c739a7ff44|-1689973547||t20116.4131463619s|77f6f88bc2a4d261|206554|rds|local|vector|||0||
+data_imputed|stem|a6c305879034d0fc|1da8610987fc2925|853bd17c96888d2d|-304612476||t20116.4131455735s|f9bbc3b85c1bdfe4|370123|rds|local|vector|||44.97||
+define_formulas|function|5c733e27a8b0fd0a|||||||||||||||
+df_analysis|stem|4caf3680e9fa3ec4|95d51b70812e225c|2cbd15654236aaa3|880797500||t20116.414157987s|e07102505eef07ae|772826|rds|local|vector|||87.31|failed creating initial embedding using random embedding instead|
+feature_engineering|function|1e231592b38ef9d3|||||||||||||||
+filter_data|function|8a442c5a012a4194|||||||||||||||
+folds|stem|7128e41cab0cae81|bf7d36478ba6894a|12488c6d47ea19cd|-1526133766||t20116.4881262894s|c721c6c41a71e87f|548|rds|local|vector|||0||
+impute_full_dataset|function|6a9a91c2c50bbd39|||||||||||||||
+name_variants|function|f6d4266b0b3f861d|||||||||||||||
+print_log|function|29953224343218cd|||||||||||||||
+rmse_forests|stem|a3e9b016955e1f96|aceb0f98f17c6383|3501d070e138f8b7|1230429478||t20116.6279066395s|3ed5ce5eeeea6e9a|72|rds|local|vector|||0||
+rmse_trees|stem|ae0f256e00d38d82|db8fe2b8500a306d|870f1b07cf760d9c|1204700031||t20116.6279104264s|f50f9fb93e1c2938|71|rds|local|vector|||0||
+run_forests|function|d83f0b9284ed4317|||||||||||||||
+run_glmm_cv|function|fadfcfb29aa3cc7b|||||||||||||||
+run_nonlinear_cv|function|e5d35d79e9357eef|||||||||||||||
+run_tree|function|f4d9572027d9a6af|||||||||||||||
+select_lambda_1se|function|e3cf6532c30a4b7a|||||||||||||||
+top_loadings|function|2269d3c4db9e309d|||||||||||||||

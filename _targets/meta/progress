@@ -1,0 +1,14 @@
+name|type|parent|branches|progress
+data|stem|data|0|skipped
+data_imputed|stem|data_imputed|0|skipped
+data_filtered|stem|data_filtered|0|skipped
+df_analysis|stem|df_analysis|0|skipped
+all_formulas|stem|all_formulas|0|skipped
+folds|stem|folds|0|skipped
+all_forests|stem|all_forests|0|skipped
+all_trees|stem|all_trees|0|skipped
+all_glmms|stem|all_glmms|0|skipped
+rmse_forests|stem|rmse_forests|0|dispatched
+rmse_forests|stem|rmse_forests|0|completed
+rmse_trees|stem|rmse_trees|0|dispatched
+rmse_trees|stem|rmse_trees|0|completed

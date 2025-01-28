@@ -1,0 +1,16 @@
+worcs_version: 0.1.17
+creator: vanlissa
+entry_point: manuscript/manuscript.Rmd
+recipe:
+  recipe: targets::tar_make()
+  terminal: no
+data:
+  data.csv:
+    save_expression: write.csv(x = data, file = filename, row.names = FALSE)
+    load_expression: read.csv(file = filename, stringsAsFactors = TRUE)
+    synthetic: synthetic_data.csv
+    codebook: codebook_data.rmd
+    labels: value_labels_data.yml
+checksums:
+  data.csv: 11e5f4125a4c6a436b0138db72a8ca76
+  synthetic_data.csv: 85c1107c9c90be9884832c66085fd423

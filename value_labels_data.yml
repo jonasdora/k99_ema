@@ -1,0 +1,85 @@
+stress_binary:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+stress_event_type:
+  class: factor
+  '1': type1
+  '2': type2
+  '3': type3
+  '4': type4
+  '5': type5
+  '6': type6
+  '7': type7
+alc_exp_relaxed:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_social:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_buzz:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_mood:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_energetic:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_hangover:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_embar:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_rude:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_vomit:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_exp_injure:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_mot_coping:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_mot_social:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+alc_mot_enhance:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+time_of_day:
+  class: factor
+  '1': afternoon
+  '2': evening
+location:
+  class: factor
+  '1': home
+  '2': other
+social:
+  class: factor
+  '1': alone
+  '2': other
+alc_cue:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
+responsibility:
+  class: factor
+  '1': 'no'
+  '2': 'yes'
