@@ -13,3 +13,6 @@
 data.csv
 !synthetic_data.csv
 !codebook_data.csv
+*.docx
+Rplot.pdf
+k99_ema_prereg_code.r
