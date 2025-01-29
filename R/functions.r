@@ -106,7 +106,9 @@ feature_engineering <- function(df) {
                                                          c("pid", "stress_state", "choice_prop"))], n_components = n_pcs)
   umap_data <- data.frame(umap_result_filtered$layout)
   names(umap_data) <- paste0("UMAP_", 1:ncol(umap_data))
-
+  # Scale these
+  pca_data <- data.frame(scale(pca_data))
+  umap_data <- data.frame(scale(umap_data))
   return(data.frame(df_with_dummies, pca_data, umap_data))
 }
 

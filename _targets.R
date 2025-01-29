@@ -46,7 +46,7 @@ list(
   )
   , tar_target(
     name = folds,
-    command = create_folds(df_analysis, k_folds = 2)
+    command = create_folds(df_analysis, k_folds = 5)
   )
   , tar_target(
     name = all_formulas,
