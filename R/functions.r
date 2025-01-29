@@ -1,27 +1,3 @@
-# Function to select lambda with smallest rmse
-select_lambda_min_rmse <- function(cv_results) {
-  # Add error checking
-  if(is.null(cv_results)) {
-    stop("cv_results is NULL")
-  }
-
-  lambda_stats <- cv_results %>%
-    dplyr::group_by(lambda) %>%
-    dplyr::summarise(
-      mean_rmse = mean(sqrt(mse)),
-      .groups = 'drop'
-    )
-
-  # Select lambda with minimum mean RMSE
-  lambda_min_rmse <- lambda_stats %>%
-    dplyr::filter(mean_rmse == min(mean_rmse)) %>%
-    dplyr::pull(lambda)
-
-  return(lambda_min_rmse)
-}
-
-
-
 print_log <- function(code) {
   sink("analysis.log", append = TRUE)
   print(eval.parent(code))
