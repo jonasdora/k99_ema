@@ -97,5 +97,8 @@ data$consumption <- NULL
 data$affect <- NULL
 
 # now we have a data set that resembles (in structure) the data we will collect
-closed_data(data)
-
+# CJ: Use synthetic = FALSE and add the manually synthesized data by hand.
+closed_data(data, synthetic = FALSE)
+# CJ: When real data are collected, set synthetic = TRUE and remove the line
+# CJ: below, or add a manually synthesized dataset using the line below.
+add_synthetic(data, original_name = "data.csv")

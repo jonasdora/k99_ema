@@ -13,4 +13,4 @@ data:
     labels: value_labels_data.yml
 checksums:
   data.csv: 11e5f4125a4c6a436b0138db72a8ca76
-  synthetic_data.csv: 85c1107c9c90be9884832c66085fd423
+  synthetic_data.csv: 11e5f4125a4c6a436b0138db72a8ca76

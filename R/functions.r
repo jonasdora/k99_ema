@@ -1,19 +1,23 @@
-# Function to select largest lambda within 1se of smallest mse (thanks, Caspar!)
-select_lambda_1se <- function(cv_results) {
-  lambda_stats <- cv_results |>
-    dplyr::group_by(lambda) |>
+# Function to select lambda with smallest rmse
+select_lambda_min_rmse <- function(cv_results) {
+  # Add error checking
+  if(is.null(cv_results)) {
+    stop("cv_results is NULL")
+  }
+
+  lambda_stats <- cv_results %>%
+    dplyr::group_by(lambda) %>%
     dplyr::summarise(
-      mean_mse = mean(mse), # CJ: I'm not sure if this is correct. You usually want to compute the square root of the mean squared error on all observations. I'm not sure if that's the same as the mean of the RMSE's across folds, I don't think so!
-      se_mse = sd(mse) / sqrt(dplyr::n()),
+      mean_rmse = mean(sqrt(mse)),
       .groups = 'drop'
     )
-  min_mse <- min(lambda_stats$mean_mse)
-  min_mse_se <- lambda_stats$se_mse[which.min(lambda_stats$mean_mse)]
-  lambda_1se <- lambda_stats |>
-    dplyr::filter(mean_mse <= min_mse + min_mse_se) |>
-    dplyr::pull(lambda) |>
-    max()
-  return(lambda_1se)
+
+  # Select lambda with minimum mean RMSE
+  lambda_min_rmse <- lambda_stats %>%
+    dplyr::filter(mean_rmse == min(mean_rmse)) %>%
+    dplyr::pull(lambda)
+
+  return(lambda_min_rmse)
 }
 
 
@@ -134,46 +138,48 @@ feature_engineering <- function(df) {
 
 # Function to flexibly run glmmLasso CV -----------------------------------
 
-run_glmm_cv <- function(data,
-                        formula,
-                        lambdas = seq(100, 0, by = -5),
-                        folds) {
+run_glmm_cv <- function(data, formula, lambdas = seq(100, 0, by = -5), folds) {
+  # Add debugging prints
+  print("Starting run_glmm_cv")
+  print(paste("Formula:", deparse(formula)))
+
   variant_name <- name_variants(formula)
   cv_results <- list()
   n_predictors <- length(attr(terms(formula), "term.labels"))
   coef_storage <- list()
-  # Cluster variable should be specified as a factor variable!
+
+  # Check inputs
+  if(is.null(data)) stop("data is NULL")
+  if(is.null(formula)) stop("formula is NULL")
+  if(is.null(folds)) stop("folds is NULL")
+
   data$pid <- as.factor(as.character(data$pid))
 
-  for (fold in 1:length(folds)) {
+  for(fold in 1:length(folds)) {
+    print(paste("Processing fold", fold))
     test_pids <- folds[[fold]]
-    train_data <- data[!(data$pid %in% test_pids), ]
-    test_data <- data[data$pid %in% test_pids, ]
+    train_data <- data[!(data$pid %in% test_pids),]
+    test_data <- data[data$pid %in% test_pids,]
 
-    for (j in 1:length(lambdas)) {
-      #print(paste(variant_name, "lambda iteration:", j, "of", length(lambdas)))
+    for(j in 1:length(lambdas)) {
+      print(paste("Lambda iteration:", j, "of", length(lambdas)))
 
       fold_model <- try(glmmLasso::glmmLasso(
         formula,
-        rnd = list(pid = ~ 1 + stress_state),
+        rnd = list(pid=~1 + stress_state),
         family = gaussian(),
         data = train_data,
         lambda = lambdas[j],
-        control = list(index = c(NA, rep(
-          1:(n_predictors - 1)
-        )))
-      ),
-      silent = TRUE)
+        control = list(index = c(NA, rep(1:(n_predictors-1))))
+      ), silent = TRUE)
 
-      if (!inherits(fold_model, "try-error")) {
+      if(!inherits(fold_model, "try-error")) {
         cv_results[[paste0("lambda_", j, "_fold_", fold)]] <-
           data.frame(
             lambda = lambdas[j],
             fold = fold,
             variant = variant_name,
-            mse = mean((
-              test_data$choice_prop - predict(fold_model, test_data)
-            )^2)
+            mse = mean((test_data$choice_prop - predict(fold_model, test_data))^2)
           )
 
         coef_storage[[paste0("lambda_", j, "_fold_", fold)]] <-
@@ -184,21 +190,25 @@ run_glmm_cv <- function(data,
             value = as.numeric(fold_model$coefficients)
           )
       } else {
+        print(paste("Error in fold", fold, "lambda", j))
         print(fold_model)
       }
     }
   }
 
-  cv_df <- do.call(rbind, cv_results)
-  optimal_lambda <- select_lambda_1se(cv_df)
+  # Check if we got any results
+  if(length(cv_results) == 0) {
+    stop("No CV results were produced")
+  }
 
-  return(
-    list(
-      cv_results = cv_results,
-      optimal_lambda = optimal_lambda,
-      coefficients = do.call(rbind, coef_storage)
-    )
-  )
+  cv_df <- do.call(rbind, cv_results)
+  optimal_lambda <- select_lambda_min_rmse(cv_df)
+
+  return(list(
+    cv_results = cv_results,
+    optimal_lambda = optimal_lambda,
+    coefficients = do.call(rbind, coef_storage)
+  ))
 }
 
 
@@ -310,5 +320,22 @@ define_formulas <- function(yvars = "coice_prop",
 
   out <- c(pca_formulas, umap_formulas, raw_formulas)
   return(lapply(out, as.formula))
+}
+
+# Fit final models using optimal lambda on full dataset  -----------------------------------------------------
+
+fit_final_glmm <- function(data, formula, optimal_lambda) {
+  n_predictors <- length(attr(terms(formula), "term.labels"))
+
+  final_model <- glmmLasso::glmmLasso(
+    formula,
+    rnd = list(pid = ~1 + stress_state),
+    family = gaussian(),
+    data = data,
+    lambda = optimal_lambda,
+    control = list(index = c(NA, rep(1:(n_predictors-1))))
+  )
+
+  return(final_model)
 }
 
