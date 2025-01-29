@@ -602,7 +602,7 @@ padding-top: 0px;
 <body>
 
 <h1 id="untitled">Untitled</h1>
-<p>28 January, 2025</p>
+<p>29 January, 2025</p>
 <p>This manuscript uses the Workflow for Open Reproducible Code in
 Science (Van Lissa et al. 2021) to ensure reproducibility and
 transparency. All code <!--and data--> are available at
@@ -610,7 +610,9 @@ transparency. All code <!--and data--> are available at
 <p>This is an example of a non-essential citation (@ Van Lissa et al.
 2021). If you change the rendering function to
 <code>worcs::cite_essential</code>, it will be removed.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(tab_fits)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">tar_load</span>(fl_tab_fits)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>fit_tbl <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(fl_tab_fits, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(fit_tbl)</span></code></pre></div>
 <table>
 <thead>
 <tr class="header">
@@ -653,17 +655,17 @@ transparency. All code <!--and data--> are available at
 <tr class="odd">
 <td align="left">choice_prop_raw</td>
 <td align="left">glmm</td>
-<td align="right">NA</td>
+<td align="right">0.3715021</td>
 </tr>
 <tr class="even">
 <td align="left">choice_prop_UMAP</td>
 <td align="left">glmm</td>
-<td align="right">NA</td>
+<td align="right">5.1819947</td>
 </tr>
 <tr class="odd">
 <td align="left">choice_prop_raw</td>
 <td align="left">glmm</td>
-<td align="right">NA</td>
+<td align="right">0.3059119</td>
 </tr>
 </tbody>
 </table>

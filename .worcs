@@ -14,3 +14,5 @@ data:
 checksums:
   data.csv: 11e5f4125a4c6a436b0138db72a8ca76
   synthetic_data.csv: 11e5f4125a4c6a436b0138db72a8ca76
+  tab_fits.csv: 7ef3ce86161a4371f9cc71783950485e
+endpoints: tab_fits.csv

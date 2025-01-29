@@ -1,6 +1,6 @@
 Untitled
 ================
-28 January, 2025
+29 January, 2025
 
 This manuscript uses the Workflow for Open Reproducible Code in Science
 (Van Lissa et al. 2021) to ensure reproducibility and transparency. All
@@ -11,7 +11,9 @@ This is an example of a non-essential citation (@ Van Lissa et al.
 it will be removed.
 
 ``` r
-knitr::kable(tab_fits)
+tar_load(fl_tab_fits)
+fit_tbl <- read.csv(fl_tab_fits, stringsAsFactors = FALSE)
+knitr::kable(fit_tbl)
 ```
 
 | model            | method |      rmse |
@@ -22,9 +24,9 @@ knitr::kable(tab_fits)
 | choice_prop_raw  | tree   | 0.1503692 |
 | choice_prop_UMAP | tree   | 0.1635244 |
 | choice_prop_raw  | tree   | 0.1517872 |
-| choice_prop_raw  | glmm   |        NA |
-| choice_prop_UMAP | glmm   |        NA |
-| choice_prop_raw  | glmm   |        NA |
+| choice_prop_raw  | glmm   | 0.3715021 |
+| choice_prop_UMAP | glmm   | 5.1819947 |
+| choice_prop_raw  | glmm   | 0.3059119 |
 
 <div id="refs" class="references csl-bib-body hanging-indent"
 entry-spacing="0">

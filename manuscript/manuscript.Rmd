@@ -18,9 +18,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(targets)
 tar_config_set(store = "../_targets")
-tar_load(tab_fits)
-# You can interact with tar objects as usual, e.g.:
-# print(model)
 ```
 
 This manuscript uses the Workflow for Open Reproducible Code in Science [@vanlissaWORCSWorkflowOpen2021] to ensure reproducibility and transparency. All code <!--and data--> are available at <k99_ema>.
@@ -29,6 +26,8 @@ This is an example of a non-essential citation [@@vanlissaWORCSWorkflowOpen2021]
 
 
 ```{r tabfit}
-knitr::kable(tab_fits)
+tar_load(fl_tab_fits)
+fit_tbl <- read.csv(fl_tab_fits, stringsAsFactors = FALSE)
+knitr::kable(fit_tbl)
 ```
 

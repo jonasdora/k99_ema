@@ -72,54 +72,20 @@ list(
     })
   )
   , tar_target(
-    name = rmse_trees,
-    command = sapply(all_trees, `[[`, "rmse")
-  )
-  , tar_target(
-    name = rmse_forests,
-    command = sapply(all_forests, function(x){x$recommended.pars$rmse[1]})
-  )
-  , tar_target(
-    name = rmse_glmm,
-    command = sapply(all_glmms, function(x) {
-      # Convert cv_results list to dataframe
-      cv_df <- do.call(rbind, x$cv_results)
-      # Use the existing function to get lambda_stats
-      lambda_stats <- cv_df %>%
-        dplyr::group_by(lambda) %>%
-        dplyr::summarise(
-          mean_rmse = mean(sqrt(mse)),
-          .groups = 'drop'
-        )
-      # Get the minimum mean_rmse
-      min(lambda_stats$mean_rmse)
-    })
-  )
-  # , tar_target( # CJ: The RMSE is not computed correctly for the GLMMs, so I'm leaving this commented for now. See note in functions.r
-  #   name = rmse_glmm,
-  #   command = sapply(all_glmms, function(x){})
-  # )
-  , tar_target(
-    name = final_models,
-    command = lapply(seq_along(all_glmms), function(i) {
-      fit_final_glmm(
-        data = df_analysis,
-        formula = all_formulas[[i]],
-        optimal_lambda = all_glmms[[i]]$optimal_lambda
-      )
-    })
-  )
-  , tar_target(
     name = tab_fits,
     command = data.frame(
       model = rep(sapply(all_formulas, name_variants), 3),
       method = rep(c("forest", "tree", "glmm"), each = 3),
-      rmse = c(
-        rmse_forests,
-        rmse_trees,
-        rmse_glmm
+      rmse = sapply(c(all_forests, all_trees, all_glmms), `[[`, "rmse")
       )
-    )
+  )
+  , tar_target(
+    name = fl_tab_fits,
+    command = {
+      write.csv(tab_fits, "tab_fits.csv", row.names = FALSE)
+      "tab_fits.csv"
+      },
+    format = "file"
   )
   , tarchetypes::tar_render(manuscript, "manuscript/manuscript.Rmd", priority = 0) # Set priority to 0 to ensure the manuscript is rendered after other results are available
 )

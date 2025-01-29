@@ -139,9 +139,6 @@ feature_engineering <- function(df) {
 # Function to flexibly run glmmLasso CV -----------------------------------
 
 run_glmm_cv <- function(data, formula, lambdas = seq(100, 0, by = -5), folds) {
-  # Add debugging prints
-  print("Starting run_glmm_cv")
-  print(paste("Formula:", deparse(formula)))
 
   variant_name <- name_variants(formula)
   cv_results <- list()
@@ -155,59 +152,32 @@ run_glmm_cv <- function(data, formula, lambdas = seq(100, 0, by = -5), folds) {
 
   data$pid <- as.factor(as.character(data$pid))
 
-  for(fold in 1:length(folds)) {
-    print(paste("Processing fold", fold))
-    test_pids <- folds[[fold]]
+  se_by_fold <- do.call(rbind, lapply(folds, function(test_pids){
+    # test_pids <- folds[[fold]]
     train_data <- data[!(data$pid %in% test_pids),]
     test_data <- data[data$pid %in% test_pids,]
-
-    for(j in 1:length(lambdas)) {
-      print(paste("Lambda iteration:", j, "of", length(lambdas)))
-
-      fold_model <- try(glmmLasso::glmmLasso(
+    do.call(cbind, lapply(lambdas, function(this_lambda){
+      fold_model <- suppressWarnings(glmmLasso::glmmLasso(
         formula,
         rnd = list(pid=~1 + stress_state),
         family = gaussian(),
         data = train_data,
-        lambda = lambdas[j],
-        control = list(index = c(NA, rep(1:(n_predictors-1))))
-      ), silent = TRUE)
+        lambda = this_lambda,
+        control = list(index = c(NA, rep(1:(n_predictors-1))))))
+        ((test_data$choice_prop - predict(fold_model, test_data))^2)
+    }))
 
-      if(!inherits(fold_model, "try-error")) {
-        cv_results[[paste0("lambda_", j, "_fold_", fold)]] <-
-          data.frame(
-            lambda = lambdas[j],
-            fold = fold,
-            variant = variant_name,
-            mse = mean((test_data$choice_prop - predict(fold_model, test_data))^2)
-          )
+  }))
+  rmses <- sqrt(colMeans(se_by_fold))
 
-        coef_storage[[paste0("lambda_", j, "_fold_", fold)]] <-
-          data.frame(
-            lambda = lambdas[j],
-            fold = fold,
-            coefficient = names(fold_model$coefficients),
-            value = as.numeric(fold_model$coefficients)
-          )
-      } else {
-        print(paste("Error in fold", fold, "lambda", j))
-        print(fold_model)
-      }
-    }
-  }
-
-  # Check if we got any results
-  if(length(cv_results) == 0) {
-    stop("No CV results were produced")
-  }
-
-  cv_df <- do.call(rbind, cv_results)
-  optimal_lambda <- select_lambda_min_rmse(cv_df)
+  optimal_lambda <- which.min(rmses)
+  final_model <- fit_final_glmm(data, formula, optimal_lambda = lambdas[which.min(rmses)])
 
   return(list(
-    cv_results = cv_results,
+    rmse = min(rmses),
     optimal_lambda = optimal_lambda,
-    coefficients = do.call(rbind, coef_storage)
+    final_model = final_model,
+    coefficients = coef(final_model)
   ))
 }
 
@@ -232,7 +202,7 @@ run_forests <- function(data, formula, folds, ...) {
 
   # Tuning process (takes around 1 minute); Tuning measure is the multiclass brier score
   res_tuned <- tuneRanger(tune_task, measure = list(rmse), ...)
-
+  res_tuned[["rmse"]] <- res_tuned$recommended.pars$rmse[1]
   return(res_tuned)
 }
 
@@ -327,14 +297,14 @@ define_formulas <- function(yvars = "coice_prop",
 fit_final_glmm <- function(data, formula, optimal_lambda) {
   n_predictors <- length(attr(terms(formula), "term.labels"))
 
-  final_model <- glmmLasso::glmmLasso(
+  final_model <- suppressWarnings(glmmLasso::glmmLasso(
     formula,
     rnd = list(pid = ~1 + stress_state),
     family = gaussian(),
     data = data,
     lambda = optimal_lambda,
     control = list(index = c(NA, rep(1:(n_predictors-1))))
-  )
+  ))
 
   return(final_model)
 }
