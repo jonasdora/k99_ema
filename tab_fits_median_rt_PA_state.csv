@@ -1,0 +1,10 @@
+"outcome","model","method","rmse"
+"median_rt","median_rt_PCA","forest",0.269803609245196
+"median_rt","median_rt_UMAP","forest",0.25640648603528
+"median_rt","median_rt_raw","forest",0.237242974066866
+"median_rt","median_rt_PCA","tree",0.284215973477632
+"median_rt","median_rt_UMAP","tree",0.279487936875665
+"median_rt","median_rt_raw","tree",0.281972446725837
+"median_rt","median_rt_PCA","glmm",0.284463873458525
+"median_rt","median_rt_UMAP","glmm",0.284103551683179
+"median_rt","median_rt_raw","glmm",0.287582692000484
