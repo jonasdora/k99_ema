@@ -1,0 +1,10 @@
+"outcome","model","method","rmse"
+"alcbias","alcbias_PCA","forest",1.26391155638629
+"alcbias","alcbias_UMAP","forest",1.16892454486275
+"alcbias","alcbias_raw","forest",1.04955205930764
+"alcbias","alcbias_PCA","tree",1.42281626729061
+"alcbias","alcbias_UMAP","tree",1.42335108801656
+"alcbias","alcbias_raw","tree",1.34944999490661
+"alcbias","alcbias_PCA","glmm",1.77235605248426
+"alcbias","alcbias_UMAP","glmm",1.58311796704677
+"alcbias","alcbias_raw","glmm",1.56349220571981
