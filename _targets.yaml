@@ -1,2 +1,12 @@
-main:
-  store: ../_targets
+stress_binary:
+  script: _targets_stress_binary.R
+  store: _targets_store_stress_binary
+stress_state:
+  script: _targets_stress_state.R
+  store: _targets_store_stress_state
+na_state:
+  script: _targets_na_state.R
+  store: _targets_store_na_state
+pa_state:
+  script: _targets_pa_state.R
+  store: _targets_store_pa_state

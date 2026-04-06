@@ -1,0 +1,537 @@
+---
+title: "`r paste0('Testing affect regulation via computational modeling of real-time alcohol choices in daily life: ', params$outcome_label)`"
+author: ""
+date: "`r Sys.Date()`"
+params:
+  outcome: "choice_prop"
+  outcome_label: "Choice Proportion"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: cosmo
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 9, fig.height = 6)
+library(targets)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ranger)
+library(glmmLasso)
+
+theme_set(theme_minimal(base_size = 13))
+
+# Create figures directory
+fig_dir <- file.path("figures", params$outcome)
+dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Helper to save a ggplot as publication-quality JPG
+save_plot <- function(p, filename, width = 9, height = 6, dpi = 300) {
+  filepath <- file.path(fig_dir, paste0(filename, ".jpg"))
+  ggsave(filepath, plot = p, width = width, height = height, dpi = dpi,
+         device = "jpeg", bg = "white")
+}
+
+# Helper to reliably print kable HTML (this gave me issues before)
+print_kable <- function(x) {
+  cat(as.character(x))
+}
+```
+
+```{r config}
+analyses <- list(
+  list(name = "Stress Binary",  predictor = "stress_binary",
+       store = "_targets_store_stress_binary"),
+  list(name = "Stress State",   predictor = "stress_state",
+       store = "_targets_store_stress_state"),
+  list(name = "Negative Affect State", predictor = "NA_state",
+       store = "_targets_store_na_state"),
+  list(name = "Positive Affect State", predictor = "PA_state",
+       store = "_targets_store_pa_state")
+)
+
+out <- params$outcome
+
+lambda_seqs <- list(
+  choice_prop = seq(100, 0, by = -5),
+  median_rt   = seq(100, 0, by = -5),
+  drift       = seq(100, 0, by = -5),
+  alcbias     = seq(200, 0, by = -10),
+  B           = seq(200, 0, by = -10)
+)
+```
+
+```{r helper-functions}
+get_component_info <- function(df) {
+  pc_cols <- grep("^PC_", names(df), value = TRUE)
+  umap_cols <- grep("^UMAP_", names(df), value = TRUE)
+  list(n_pca = length(pc_cols), n_umap = length(umap_cols))
+}
+
+get_component_composition <- function(df, outcome, predictor, prefix = "PC_", n_top = 5) {
+  comp_cols <- grep(paste0("^", prefix), names(df), value = TRUE)
+  raw_cols <- setdiff(names(df),
+                      c("pid", outcome, predictor,
+                        grep("^PC_|^UMAP_", names(df), value = TRUE)))
+  results <- list()
+  for (comp in comp_cols) {
+    cors <- sapply(raw_cols, function(v) cor(df[[comp]], df[[v]], use = "complete.obs"))
+    top_idx <- order(abs(cors), decreasing = TRUE)[1:min(n_top, length(cors))]
+    results[[comp]] <- data.frame(
+      Variable = raw_cols[top_idx],
+      Correlation = round(cors[top_idx], 3),
+      stringsAsFactors = FALSE, row.names = NULL)
+  }
+  results
+}
+
+format_glmm_coefs <- function(glmm_result, variant_label) {
+  coefs <- glmm_result$coefficients
+  if (is.null(coefs)) return(NULL)
+  data.frame(Term = names(coefs), Estimate = round(as.numeric(coefs), 4),
+             stringsAsFactors = FALSE)
+}
+
+get_variant_label <- function(formula_obj) {
+  f_text <- as.character(formula_obj)
+  if (any(grepl("PC_", f_text))) return("PCA")
+  if (any(grepl("UMAP_", f_text))) return("UMAP")
+  return("Raw")
+}
+
+reorder_by_variant <- function(formulas, results_list) {
+  labels <- sapply(formulas, get_variant_label)
+  desired_order <- c("Raw", "PCA", "UMAP")
+  ord <- match(labels, desired_order)
+  list(formulas = formulas[order(ord)], results = results_list[order(ord)])
+}
+
+classify_glmm_terms <- function(term_names, predictor) {
+  is_intercept <- term_names == "(Intercept)"
+  is_focal <- term_names == predictor
+  is_interaction_with_focal <- (
+    grepl(paste0(":", predictor, "$"), term_names) |
+    grepl(paste0("^", predictor, ":"), term_names)
+  ) & !is_focal
+
+  category <- rep("Covariate main effect", length(term_names))
+  category[is_intercept] <- "Intercept"
+  category[is_focal] <- "Focal predictor"
+  category[is_interaction_with_focal] <- "Interaction with focal predictor"
+  category
+}
+
+refit_ranger_with_importance <- function(forest_result, df_analysis, formula_obj) {
+  rec <- forest_result$recommended.pars
+  outcome_var <- as.character(formula_obj)[2]
+  pred_vars <- setdiff(all.vars(formula_obj), outcome_var)
+  model_data <- df_analysis[, c(outcome_var, pred_vars)]
+
+  simple_formula <- as.formula(paste(outcome_var, "~ ."))
+  ranger(simple_formula, data = model_data, num.trees = 500,
+         mtry = rec$mtry, min.node.size = rec$min.node.size,
+         sample.fraction = rec$sample.fraction, importance = "permutation")
+}
+
+compute_pdp <- function(model, data, var_name, grid_size = 25) {
+  if (is.numeric(data[[var_name]])) {
+    grid_vals <- seq(min(data[[var_name]], na.rm = TRUE),
+                     max(data[[var_name]], na.rm = TRUE),
+                     length.out = grid_size)
+  } else {
+    grid_vals <- unique(data[[var_name]])
+  }
+  pd <- sapply(grid_vals, function(val) {
+    data_mod <- data
+    data_mod[[var_name]] <- val
+    mean(predict(model, data = data_mod)$predictions)
+  })
+  data.frame(value = grid_vals, yhat = pd, variable = var_name,
+             stringsAsFactors = FALSE)
+}
+
+get_glmm_fitted <- function(model) {
+  if (!is.null(model$y_hat)) return(as.numeric(model$y_hat))
+  if (!is.null(model$fitted.values)) return(as.numeric(model$fitted.values))
+  return(NULL)
+}
+```
+
+# About This Report
+
+This report presents results for **`r params$outcome_label`** (`r params$outcome`) across all four focal predictors: stress (binary), stress (state), negative affect (state), and positive affect (state).
+
+For each predictor, the report is organized as follows:
+
+- **Dimensionality reduction:** PCA and UMAP component composition tables, showing which raw variables load most strongly onto each component.
+- **GLMM results (raw features):** Summary of results from GLMM model with raw variables.
+- **Random forest results (raw features):** Summary of results from random forest model with raw variables.
+- **Model comparison:** RMSE comparison table across all methods (GLMM, random forest, decision tree) and feature sets (raw, PCA, UMAP).
+
+```{r results='asis'}
+for (analysis in analyses) {
+
+  cat("\n\n# ", analysis$name, " (", analysis$predictor, ")\n\n", sep = "")
+
+  # ---- Load targets ----
+  df_analysis <- tar_read_raw(paste0("df_analysis_", out), store = analysis$store)
+  all_formulas <- tar_read_raw(paste0("all_formulas_", out), store = analysis$store)
+  all_glmms <- tar_read_raw(paste0("all_glmms_", out), store = analysis$store)
+  all_forests <- tar_read_raw(paste0("all_forests_", out), store = analysis$store)
+  tab_fits <- tar_read_raw(paste0("tab_fits_", out), store = analysis$store)
+
+  # Identify raw variant
+  variant_labels <- sapply(all_formulas, get_variant_label)
+  raw_idx <- which(variant_labels == "Raw")
+  raw_formula <- all_formulas[[raw_idx]]
+  raw_glmm <- all_glmms[[raw_idx]]
+  raw_forest <- all_forests[[raw_idx]]
+
+  predictor <- analysis$predictor
+  lambdas <- lambda_seqs[[out]]
+  outcome_var <- out
+  y_var <- df_analysis[[out]]
+  y_range <- range(y_var, na.rm = TRUE)
+
+  # Prefix for figure filenames
+  fig_prefix <- paste0(predictor, "_", out)
+
+  # ===========================================================================
+  # DIMENSIONALITY REDUCTION
+  # ===========================================================================
+  comp_info <- get_component_info(df_analysis)
+
+  cat("## Dimensionality Reduction\n\n")
+  cat("- **PCA components (80% variance, max 5):**", comp_info$n_pca, "\n")
+  cat("- **UMAP components (matching PCA):**", comp_info$n_umap, "\n\n")
+
+  cat("### PCA Component Composition (top 5 correlated variables)\n\n")
+  pca_comp <- get_component_composition(df_analysis, out, predictor, prefix = "PC_")
+  for (pc_name in names(pca_comp)) {
+    cat("**", pc_name, "**\n\n", sep = "")
+    print_kable(
+      kable(pca_comp[[pc_name]], row.names = FALSE, format = "html") %>%
+        kable_styling(bootstrap_options = c("striped", "condensed"),
+                      full_width = FALSE, font_size = 12)
+    )
+    cat("\n\n")
+  }
+
+  cat("### UMAP Component Composition (top 5 correlated variables)\n\n")
+  umap_comp <- get_component_composition(df_analysis, out, predictor, prefix = "UMAP_")
+  for (umap_name in names(umap_comp)) {
+    cat("**", umap_name, "**\n\n", sep = "")
+    print_kable(
+      kable(umap_comp[[umap_name]], row.names = FALSE, format = "html") %>%
+        kable_styling(bootstrap_options = c("striped", "condensed"),
+                      full_width = FALSE, font_size = 12)
+    )
+    cat("\n\n")
+  }
+
+  # ===========================================================================
+  # GLMM RESULTS — RAW FEATURES
+  # ===========================================================================
+  cat("## GLMM Results\n\n")
+  cat("### Raw Features\n\n")
+
+  lambda_index <- raw_glmm$optimal_lambda
+  actual_lambda <- lambdas[lambda_index]
+
+  cat("- **Optimal lambda:**", actual_lambda,
+      paste0("(index ", lambda_index, " of ", length(lambdas), ")"), "\n")
+  cat("- **CV RMSE:**", round(raw_glmm$rmse, 4), "\n\n")
+
+  # ----- Coefficient table -----
+  coef_df <- format_glmm_coefs(raw_glmm, "Raw")
+  if (!is.null(coef_df)) {
+    coef_df$Category <- classify_glmm_terms(coef_df$Term, predictor)
+
+    nonzero <- coef_df %>% filter(Estimate != 0)
+    n_zero <- nrow(coef_df) - nrow(nonzero)
+
+    cat_order <- c("Intercept", "Focal predictor",
+                   "Covariate main effect", "Interaction with focal predictor")
+    nonzero$Category <- factor(nonzero$Category, levels = cat_order)
+    nonzero <- nonzero %>% arrange(Category, desc(abs(Estimate)))
+
+    focal_rows <- which(nonzero$Category %in%
+                          c("Focal predictor", "Interaction with focal predictor"))
+
+    cat("**Non-zero coefficients** (focal predictor terms highlighted):\n\n")
+    print_kable(
+      kable(nonzero, row.names = FALSE, format = "html") %>%
+        kable_styling(bootstrap_options = c("striped", "condensed"),
+                      full_width = FALSE, font_size = 12) %>%
+        row_spec(focal_rows, bold = TRUE, background = "#FFF3CD")
+    )
+    cat("\n\n*", n_zero, "coefficients penalized to zero.*\n\n")
+  }
+
+  # ----- Predicted vs Observed (resubstitution) -----
+  cat("#### Predicted vs. Observed\n\n")
+
+  final_model_glmm <- raw_glmm$final_model
+  glmm_preds <- get_glmm_fitted(final_model_glmm)
+  glmm_actual <- y_var
+
+  if (is.null(glmm_preds)) {
+    cat("*Could not extract fitted values from glmmLasso model.*\n\n")
+  } else {
+
+    glmm_pred_df <- data.frame(Predicted = glmm_preds, Observed = glmm_actual)
+
+    p_predobs_glmm <- ggplot(glmm_pred_df, aes(x = Observed, y = Predicted)) +
+      geom_point(alpha = 0.3, size = 1) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+      geom_smooth(method = "lm", se = FALSE, color = "steelblue", linewidth = 0.7) +
+      labs(title = paste0("GLMM Predicted vs. Observed: ",
+                          predictor, " -> ", params$outcome_label))
+    print(p_predobs_glmm)
+    save_plot(p_predobs_glmm, paste0(fig_prefix, "_glmm_pred_vs_obs"))
+    cat("\n\n")
+
+    # ----- Residual diagnostics -----
+    cat("#### Residual Diagnostics\n\n")
+
+    glmm_resids <- glmm_actual - glmm_preds
+    resid_df <- data.frame(Fitted = glmm_preds, Residuals = glmm_resids)
+
+    p_resid_fitted <- ggplot(resid_df, aes(x = Fitted, y = Residuals)) +
+      geom_point(alpha = 0.3, size = 1) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      geom_smooth(method = "loess", se = FALSE, color = "steelblue", linewidth = 0.7) +
+      labs(title = paste0("GLMM Residuals vs. Fitted: ",
+                          predictor, " -> ", params$outcome_label))
+    print(p_resid_fitted)
+    save_plot(p_resid_fitted, paste0(fig_prefix, "_glmm_resid_vs_fitted"))
+    cat("\n\n")
+
+    p_qq <- ggplot(resid_df, aes(sample = Residuals)) +
+      stat_qq(alpha = 0.3, size = 1) +
+      stat_qq_line(color = "red") +
+      labs(title = paste0("GLMM Q-Q Plot: ",
+                          predictor, " -> ", params$outcome_label),
+           x = "Theoretical Quantiles", y = "Sample Quantiles")
+    print(p_qq)
+    save_plot(p_qq, paste0(fig_prefix, "_glmm_qqplot"))
+    cat("\n\n")
+  }
+
+  # ----- PCA & UMAP GLMM results -----
+  reordered <- reorder_by_variant(all_formulas, all_glmms)
+
+  for (i in seq_along(reordered$results)) {
+    variant <- get_variant_label(reordered$formulas[[i]])
+    if (variant == "Raw") next
+
+    glmm_i <- reordered$results[[i]]
+    lambda_index_i <- glmm_i$optimal_lambda
+    actual_lambda_i <- lambdas[lambda_index_i]
+
+    cat("### ", variant, " Features\n\n", sep = "")
+    cat("- **Optimal lambda:**", actual_lambda_i,
+        paste0("(index ", lambda_index_i, " of ", length(lambdas), ")"), "\n")
+    cat("- **CV RMSE:**", round(glmm_i$rmse, 4), "\n\n")
+
+    coef_df_i <- format_glmm_coefs(glmm_i, variant)
+    if (!is.null(coef_df_i)) {
+      nonzero_i <- coef_df_i %>% filter(Estimate != 0)
+      n_zero_i <- nrow(coef_df_i) - nrow(nonzero_i)
+      cat("**Non-zero coefficients:**\n\n")
+      print_kable(
+        kable(nonzero_i, row.names = FALSE, format = "html") %>%
+          kable_styling(bootstrap_options = c("striped", "condensed"),
+                        full_width = FALSE, font_size = 12)
+      )
+      cat("\n\n*", n_zero_i, "coefficients penalized to zero.*\n\n")
+    }
+  }
+
+  # ===========================================================================
+  # RANDOM FOREST RESULTS (Raw only)
+  # ===========================================================================
+  cat("## Random Forest Results (Raw)\n\n")
+
+  rf_model <- tryCatch({
+    refit_ranger_with_importance(raw_forest, df_analysis, raw_formula)
+  }, error = function(e) {
+    cat("*Could not refit ranger model:", conditionMessage(e), "*\n\n")
+    NULL
+  })
+
+  if (!is.null(rf_model)) {
+
+    rec_pars <- raw_forest$recommended.pars
+    cat("### Tuning Summary\n\n")
+    cat("- **mtry:**", rec_pars$mtry, "\n")
+    cat("- **min.node.size:**", rec_pars$min.node.size, "\n")
+    cat("- **sample.fraction:**", round(rec_pars$sample.fraction, 3), "\n")
+    cat("- **CV RMSE:**", round(raw_forest$rmse, 4), "\n\n")
+
+    # ----- Variable importance (lollipop style) -----
+    cat("### Variable Importance (Permutation)\n\n")
+
+    imp <- importance(rf_model)
+    imp_df <- data.frame(
+      Variable = names(imp),
+      Importance = imp,
+      stringsAsFactors = FALSE
+    ) %>%
+      mutate(
+        is_focal = Variable == predictor |
+          grepl(paste0(":", predictor, "$|^", predictor, ":"), Variable),
+        fill_group = ifelse(is_focal,
+                            "Focal predictor (or interaction)", "Other")
+      ) %>%
+      arrange(desc(Importance))
+
+    imp_top <- imp_df %>% slice_head(n = 25)
+    imp_top$Variable <- ordered(imp_top$Variable, levels = rev(imp_top$Variable))
+
+    p_imp <- ggplot(imp_top,
+                    aes(y = Variable, x = Importance, color = fill_group)) +
+      geom_segment(aes(x = 0, xend = Importance, y = Variable, yend = Variable),
+                   colour = "grey50", linetype = 2) +
+      geom_vline(xintercept = 0, colour = "grey50", linetype = 1) +
+      geom_point(size = 2.5) +
+      scale_color_manual(values = c(
+        "Focal predictor (or interaction)" = "#E69F00",
+        "Other" = "steelblue")) +
+      labs(title = paste0("Variable Importance (Top 25): ",
+                          predictor, " -> ", params$outcome_label),
+           x = "Permutation Importance", color = NULL) +
+      theme_bw() +
+      theme(panel.grid.major.x = element_blank(),
+            panel.grid.minor.x = element_blank(),
+            axis.title.y = element_blank(),
+            legend.position = "bottom")
+    print(p_imp)
+    save_plot(p_imp, paste0(fig_prefix, "_rf_importance"), height = 8)
+    cat("\n\n")
+
+    # Full importance table
+    cat("**Full importance ranking:**\n\n")
+    imp_table <- imp_df %>%
+      select(Variable, Importance) %>%
+      mutate(Importance = round(Importance, 6))
+    focal_rows_imp <- which(imp_df$is_focal)
+    print_kable(
+      kable(imp_table, row.names = FALSE, format = "html") %>%
+        kable_styling(bootstrap_options = c("striped", "condensed"),
+                      full_width = FALSE, font_size = 11) %>%
+        row_spec(focal_rows_imp, bold = TRUE, background = "#FFF3CD") %>%
+        scroll_box(height = "400px")
+    )
+    cat("\n\n")
+
+    # ----- Partial dependence plots -----
+    cat("### Partial Dependence Plots\n\n")
+    cat("PDP for the focal predictor and the top 5 most important ",
+        "non-interaction covariates.\n\n", sep = "")
+
+    pred_vars <- setdiff(all.vars(raw_formula), outcome_var)
+    model_data <- df_analysis[, c(outcome_var, pred_vars)]
+
+    # Focal predictor
+    cat("#### Focal Predictor: ", predictor, "\n\n", sep = "")
+    pdp_focal <- compute_pdp(rf_model, model_data, predictor)
+
+    p_pdp_focal <- ggplot(pdp_focal, aes(x = value, y = yhat)) +
+      geom_line(color = "#E69F00", linewidth = 1.2) +
+      geom_point(color = "#E69F00", size = 2) +
+      coord_cartesian(ylim = y_range) +
+      labs(title = paste0("PDP: ", predictor, " -> ", params$outcome_label),
+           x = predictor, y = paste0("Predicted ", out)) +
+      theme(plot.title = element_text(face = "bold"))
+    print(p_pdp_focal)
+    save_plot(p_pdp_focal, paste0(fig_prefix, "_rf_pdp_", predictor))
+    cat("\n\n")
+
+    # Top 5 non-interaction covariates
+    top5_vars <- imp_df %>%
+      filter(Variable != predictor, !grepl(":", Variable)) %>%
+      slice_head(n = 5) %>%
+      pull(Variable)
+
+    for (v in top5_vars) {
+      pdp_v <- compute_pdp(rf_model, model_data, v)
+      p_v <- ggplot(pdp_v, aes(x = value, y = yhat)) +
+        geom_line(color = "steelblue", linewidth = 0.9) +
+        geom_point(color = "steelblue", size = 1.5) +
+        coord_cartesian(ylim = y_range) +
+        labs(title = paste0("PDP: ", v, " (", predictor, " -> ",
+                            params$outcome_label, ")"),
+             x = v, y = paste0("Predicted ", out))
+      print(p_v)
+      save_plot(p_v, paste0(fig_prefix, "_rf_pdp_",
+                            gsub("[^A-Za-z0-9_]", "_", v)))
+      cat("\n\n")
+    }
+
+    # ----- Forest: Predicted vs Observed -----
+    cat("### Predicted vs. Observed\n\n")
+
+    rf_preds <- predict(rf_model, data = model_data)$predictions
+    rf_actual <- model_data[[outcome_var]]
+
+    rf_pred_df <- data.frame(Predicted = rf_preds, Observed = rf_actual)
+
+    p_predobs_rf <- ggplot(rf_pred_df, aes(x = Observed, y = Predicted)) +
+      geom_point(alpha = 0.3, size = 1) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+      geom_smooth(method = "lm", se = FALSE, color = "steelblue", linewidth = 0.7) +
+      labs(title = paste0("Forest Predicted vs. Observed: ",
+                          predictor, " -> ", params$outcome_label))
+    print(p_predobs_rf)
+    save_plot(p_predobs_rf, paste0(fig_prefix, "_rf_pred_vs_obs"))
+    cat("\n\n")
+
+  } # end if rf_model not null
+
+  # ===========================================================================
+  # MODEL COMPARISON
+  # ===========================================================================
+  cat("## Model Comparison\n\n")
+
+  rmse_table <- tab_fits %>%
+    mutate(
+      feature_set = case_when(
+        grepl("PCA", model)  ~ "PCA",
+        grepl("UMAP", model) ~ "UMAP",
+        TRUE ~ "Raw"),
+      rmse = round(rmse, 4)) %>%
+    select(method, feature_set, rmse) %>%
+    tidyr::pivot_wider(names_from = feature_set, values_from = rmse) %>%
+    arrange(match(method, c("glmm", "forest", "tree"))) %>%
+    select(method, Raw, PCA, UMAP)
+
+  cat("### RMSE Comparison (all methods and feature sets)\n\n")
+  print_kable(
+    kable(rmse_table, format = "html",
+          col.names = c("Method", "Raw", "PCA", "UMAP")) %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                    full_width = FALSE) %>%
+      column_spec(1, bold = TRUE)
+  )
+  cat("\n\n")
+
+  cat("---\n\n")
+}
+```
+
+*Note: The MetaForest package (`metaforest`) uses random forests designed for
+meta-analytic data, where observations have known sampling variances and are
+nested within studies. While the clustering structure (observations within
+participants) is conceptually similar to EMA data, MetaForest specifically
+requires sampling variance estimates (`vi`) that are not available in this
+context. The analytical patterns from that framework (variable
+importance, partial dependence) have been adopted above without the
+MetaForest package itself.*
