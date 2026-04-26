@@ -34,9 +34,9 @@ dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Helper to save a ggplot as publication-quality JPG
 save_plot <- function(p, filename, width = 9, height = 6, dpi = 300) {
-  filepath <- file.path(fig_dir, paste0(filename, ".jpg"))
-  ggsave(filepath, plot = p, width = width, height = height, dpi = dpi,
-         device = "jpeg", bg = "white")
+  filepath <- file.path(fig_dir, paste0(filename, ".pdf"))
+  ggsave(filepath, plot = p, width = width, height = height, units = "in",
+         device = cairo_pdf, bg = "white")
 }
 
 # Helper to reliably print kable HTML (this gave me issues before)
