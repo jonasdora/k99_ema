@@ -526,12 +526,3 @@ for (analysis in analyses) {
   cat("---\n\n")
 }
 ```
-
-*Note: The MetaForest package (`metaforest`) uses random forests designed for
-meta-analytic data, where observations have known sampling variances and are
-nested within studies. While the clustering structure (observations within
-participants) is conceptually similar to EMA data, MetaForest specifically
-requires sampling variance estimates (`vi`) that are not available in this
-context. The analytical patterns from that framework (variable
-importance, partial dependence) have been adopted above without the
-MetaForest package itself.*
