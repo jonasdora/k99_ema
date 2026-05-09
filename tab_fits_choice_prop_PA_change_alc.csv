@@ -1,0 +1,10 @@
+"outcome","model","method","rmse"
+"choice_prop","choice_prop_PCA","forest",0.231035702969524
+"choice_prop","choice_prop_UMAP","forest",0.211592113500341
+"choice_prop","choice_prop_raw","forest",0.19068417555407
+"choice_prop","choice_prop_PCA","tree",0.261292245249264
+"choice_prop","choice_prop_UMAP","tree",0.264924700181732
+"choice_prop","choice_prop_raw","tree",0.245946453664035
+"choice_prop","choice_prop_PCA","glmm",0.315471169707955
+"choice_prop","choice_prop_UMAP","glmm",0.286738006890577
+"choice_prop","choice_prop_raw","glmm",0.280924966680788

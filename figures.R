@@ -13,13 +13,17 @@ library(stringr)
 library(patchwork)
 library(ggh4x)
 
-theme_paper <- theme_bw(base_size = 9) +
+theme_paper <- theme_bw(base_size = 11) +
   theme(panel.grid.minor   = element_blank(),
         strip.background   = element_rect(fill = "grey92", color = NA),
-        strip.text         = element_text(size = 12, face = "bold"),
-        plot.title         = element_text(size = 14, face = "bold"),
-        plot.subtitle      = element_text(size = 12),
-        plot.tag           = element_text(size = 14, face = "bold"),
+        strip.text         = element_text(size = 14, face = "bold"),
+        plot.title         = element_text(size = 16, face = "bold"),
+        plot.subtitle      = element_text(size = 14),
+        plot.tag           = element_text(size = 16, face = "bold"),
+        axis.title         = element_text(size = 13),
+        axis.text          = element_text(size = 11),
+        legend.title       = element_text(size = 12),
+        legend.text        = element_text(size = 11),
         legend.position    = "bottom",
         legend.margin      = margin(t = 0, b = 0),
         panel.spacing      = unit(0.6, "lines"))
@@ -259,7 +263,9 @@ make_outcome_figure <- function(outcome_name,
       y = NULL,
       tag = fig_tag_B,
       title = "LASSO effects"
-    )
+    ) +
+    theme(strip.text  = element_text(size = 10, face = "bold"),
+          axis.text.x = element_text(size = 8))
 
   pA / pB + plot_layout(heights = c(1, 1.9))
 }
@@ -328,7 +334,7 @@ fig6 <- make_outcome_figure(
   fig_tag_A          = "A",
   fig_tag_B          = "B"
 )
-save_fig(fig6, "fig_06_choice_prop", width = 10.5, height = 8.5)
+save_fig(fig6, "fig_06_choice_prop", width = 13, height = 8.5)
 
 
 fig7 <- make_outcome_figure(
@@ -342,7 +348,7 @@ fig7 <- make_outcome_figure(
   fig_tag_A          = "A",
   fig_tag_B          = "B"
 )
-save_fig(fig7, "fig_07_alcbias", width = 10.5, height = 8.5)
+save_fig(fig7, "fig_07_alcbias", width = 13, height = 8.5)
 
 forest_outcomes <- c("choice_prop", "alcbias")
 
@@ -439,3 +445,175 @@ if (length(pos_scales) > 0) {
 
 fig8 <- pA_f8 / pB_f8 + plot_layout(heights = c(1, 1.25))
 save_fig(fig8, "fig_08_forest", width = 11, height = 13)
+
+
+
+
+
+outcome_order  <- c("choice_prop", "median_rt", "drift", "alcbias")
+outcome_labels <- c(choice_prop = "Alcohol\nchoice prop.",
+                    median_rt   = "Median RT",
+                    drift       = "Drift rate",
+                    alcbias     = "Alcohol bias")
+
+N_MODERATORS <- 15
+RF_TOPK      <- 15
+
+clean_term <- function(x) {
+  x %>%
+    str_replace("^alc_exp_",        "Expect: ") %>%
+    str_replace("^alc_mot_",        "Motive: ") %>%
+    str_replace("^alc_cue",         "Alc. cue: ") %>%
+    str_replace("^social_context_", "With: ") %>%
+    str_replace("^location",        "Loc: ") %>%
+    str_replace("^time_of_day",     "Time: ") %>%
+    str_replace("Yes$", "") %>%
+    str_replace_all("_", " ") %>%
+    str_replace_all("\\s+", " ") %>%
+    str_replace("nauseous vomit",  "nausea/vomit") %>%
+    str_replace("restaurant cafe", "restaurant/cafe") %>%
+    str_squish()
+}
+
+interaction_partner_one <- function(term, predictor) {
+  out <- sub(paste0(":", predictor, "$"), "", term)
+  out <- sub(paste0("^", predictor, ":"), "", out)
+  out
+}
+interaction_partner <- Vectorize(interaction_partner_one, USE.NAMES = FALSE)
+
+rescale_coef <- function(estimate, predictor) {
+  estimate * unname(pred_range[predictor])
+}
+
+save_fig <- function(plot, name, width, height) {
+  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
+         width = width, height = height, units = "in", device = cairo_pdf)
+  ggsave(file.path(FIG_DIR, paste0(name, ".png")), plot,
+         width = width, height = height, units = "in", dpi = 600, bg = "white")
+}
+
+glmm_coefs <- read_csv(file.path(DATA_DIR, "glmm_raw_coefs.csv"),
+                       show_col_types = FALSE)
+forest_vi  <- read_csv(file.path(DATA_DIR, "forest_vi_top30.csv"),
+                       show_col_types = FALSE)
+
+interactions <- glmm_coefs %>%
+  filter(category == "Interaction with focal predictor",
+         outcome %in% outcome_order) %>%
+  mutate(
+    moderator = interaction_partner(term, predictor),
+    rescaled  = rescale_coef(estimate, predictor)
+  ) %>%
+  select(outcome, predictor, moderator, estimate, rescaled)
+
+rf_top <- forest_vi %>%
+  filter(outcome %in% outcome_order,
+         !is_focal,
+         !grepl(":", variable)) %>%
+  group_by(outcome, predictor) %>%
+  slice_max(importance, n = RF_TOPK, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(outcome, predictor, moderator = variable, in_rf_top = TRUE)
+
+top_moderators_summary <- interactions %>%
+  group_by(moderator) %>%
+  summarize(
+    total_abs = sum(abs(rescaled), na.rm = TRUE),
+    n_pos     = sum(rescaled > 0,  na.rm = TRUE),
+    n_neg     = sum(rescaled < 0,  na.rm = TRUE),
+    n_zero    = sum(rescaled == 0, na.rm = TRUE),
+    .groups   = "drop"
+  ) %>%
+  arrange(desc(total_abs))
+
+top_moderators <- top_moderators_summary %>%
+  slice_head(n = N_MODERATORS) %>%
+  pull(moderator)
+
+heatmap_dat <- interactions %>%
+  filter(moderator %in% top_moderators) %>%
+  left_join(rf_top, by = c("outcome", "predictor", "moderator")) %>%
+  mutate(in_rf_top = !is.na(in_rf_top) & in_rf_top)
+
+heatmap_dat <- heatmap_dat %>%
+  group_by(outcome) %>%
+  mutate(
+    scale_max  = max(abs(rescaled), na.rm = TRUE),
+    rescaled_z = if_else(scale_max > 0, rescaled / scale_max, 0)
+  ) %>%
+  ungroup()
+
+consistency <- heatmap_dat %>%
+  group_by(moderator) %>%
+  summarize(
+    n_pos  = sum(rescaled > 0, na.rm = TRUE),
+    n_neg  = sum(rescaled < 0, na.rm = TRUE),
+    n_modal = max(n_pos, n_neg),
+    modal_sign = case_when(n_pos > n_neg ~ "+",
+                           n_neg > n_pos ~ "-",
+                           TRUE ~ "0"),
+    .groups = "drop"
+  ) %>%
+  mutate(score_lab = sprintf("%s%d/16", modal_sign, n_modal))
+
+moderator_order <- top_moderators_summary %>%
+  filter(moderator %in% top_moderators) %>%
+  arrange(total_abs) %>%
+  pull(moderator)
+
+mod_labels <- consistency %>%
+  filter(moderator %in% top_moderators) %>%
+  mutate(display = paste0(clean_term(moderator), "  (", score_lab, ")")) %>%
+  select(moderator, display)
+
+heatmap_dat <- heatmap_dat %>%
+  left_join(mod_labels, by = "moderator") %>%
+  mutate(
+    moderator_lab = factor(display,
+                           levels = mod_labels$display[
+                             match(moderator_order, mod_labels$moderator)]),
+    outcome_lab   = factor(outcome,
+                           levels = outcome_order,
+                           labels = outcome_labels[outcome_order]),
+    predictor_lab = factor(predictor,
+                           levels = pred_order,
+                           labels = pred_labels[pred_order])
+  )
+
+heat <- ggplot(heatmap_dat,
+               aes(x = outcome_lab, y = moderator_lab,
+                   fill = rescaled_z)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  geom_point(data = heatmap_dat %>% filter(in_rf_top),
+             aes(x = outcome_lab, y = moderator_lab),
+             inherit.aes = FALSE,
+             shape = 21, fill = "white", color = "black",
+             size = 1.0, stroke = 0.4) +
+  scale_fill_gradient2(
+    low = "#0b5351", mid = "white", high = "#a44200",
+    midpoint = 0, limits = c(-1, 1),
+    breaks  = c(-1, 0, 1),
+    labels  = c("-", "0", "+"),
+    name    = "LASSO interaction coefficient"
+  ) +
+  guides(fill = guide_colorbar(title.position = "top", title.hjust = 0.5,
+                               barwidth = unit(7, "cm"),
+                               barheight = unit(0.35, "cm"))) +
+  facet_grid(~ predictor_lab) +
+  labs(
+    x = NULL, y = NULL,
+  ) +
+  theme(
+    axis.text.x      = element_text(size = 9, lineheight = 0.8),
+    axis.text.y      = element_text(size = 10),
+    panel.grid       = element_blank(),
+    legend.position  = "bottom",
+    legend.box       = "horizontal",
+    plot.caption     = element_text(hjust = 0, size = 8.5, color = "grey25",
+                                    margin = margin(t = 10),
+                                    lineheight = 1.2),
+    plot.margin      = margin(8, 12, 8, 8)
+  )
+
+save_fig(heat, "fig_09_consistency_heatmap", width = 13.5, height = 6)
