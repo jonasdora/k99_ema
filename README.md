@@ -55,17 +55,13 @@ Please refer to the vignette on [reproducing a WORCS project]() for step by step
 
 ## Access to data
 
-When we submit the paper we intend to make the anonymized data freely publicly available here.
-
-At the moment, synthetic data with similar characteristics to the original data have been provided. Using the function load_data() will load these synthetic data when the original data are unavailable. Note that these synthetic data cannot be used to reproduce the original results. However, it does allow users to run the code and, optionally, generate valid code that can be evaluated using the original data by the project authors.
-To request access to the original data, [open a GitHub issue](https://docs.github.com/en/free-pro-team@latest/github/managing-your-work-on-github/creating-an-issue).
+The processed data required to reproduce the machine learning analyses are in this repository. The raw data file was too large, but it can be found on the OSF project page associated with this paper: https://osf.io/5cz8p/ 
 
 <!--Clarify here how users should contact you to gain access to the data, or to submit syntax for evaluation on the original data.-->
 
 
 ## Access to data
 
-Some of the data used in this project are not publically available.
-To request access to the original data, [open a GitHub issue](https://docs.github.com/en/free-pro-team@latest/github/managing-your-work-on-github/creating-an-issue).
+We share all of our data as part of this project. You do not need to contact me to gain access to the data, but if you are working on a project in which you use them, I'd love to hear about it!
 
 <!--Clarify here how users should contact you to gain access to the data, or to submit syntax for evaluation on the original data.-->
