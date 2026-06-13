@@ -1,0 +1,10 @@
+"outcome","model","method","rmse"
+"drift","drift_PCA","forest",0.285726028213958
+"drift","drift_UMAP","forest",0.27250155153968
+"drift","drift_raw","forest",0.256734407840673
+"drift","drift_PCA","tree",0.302670999086621
+"drift","drift_UMAP","tree",0.304603369280729
+"drift","drift_raw","tree",0.301569583014604
+"drift","drift_PCA","glmm",0.307780272699414
+"drift","drift_UMAP","glmm",0.304099549424863
+"drift","drift_raw","glmm",0.311306884713482

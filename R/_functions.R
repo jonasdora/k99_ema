@@ -179,9 +179,9 @@ run_glmm_cv <- function(data, formula, outcome, predictor,
     optimal_lambda = optimal_lambda,
     final_model = final_model,
     coefficients = coef(final_model),
-    all_rmses = rmses,                             # RMSE at every lambda
+    all_rmses = rmses,                          # RMSE at every lambda
     all_rmse_sds = rmse_sds,                       # SD of fold-level RMSEs
-    mse_cv = fold_mses[, optimal_lambda]           # fold-level MSEs at optimal lambda
+    mse_cv = fold_mses[, optimal_lambda]    # fold-level MSEs at optimal lambda
   ))
 }
 

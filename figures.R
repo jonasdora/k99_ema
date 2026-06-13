@@ -43,7 +43,7 @@ pred_range <- c(
   NA_state      = 4,
   PA_state      = 4
 )
-pred_colors <- c( # Mystic ember glow from coolors.co
+pred_colors <- c( # Mystic ember glow from coolors.co: https://coolors.co/palette/3c1518-69140e-a44200-d58936
   "Stressful event" = "#3c1518",
   "Stress rating"   = "#69140e",
   "Negative affect" = "#a44200",
@@ -287,7 +287,7 @@ rmse_fig <- rmse_all %>%
     feature_set   = factor(feature_set, levels = feature_order)
   )
 
-fig5 <- ggplot(rmse_fig, aes(x = feature_set, y = rmse_dev,
+fig3 <- ggplot(rmse_fig, aes(x = feature_set, y = rmse_dev,
                              color = method_lbl, shape = method_lbl)) +
   geom_hline(yintercept = 0, color = "grey70", linewidth = 0.3) +
   geom_hline(yintercept = -10, linetype = "dashed",
@@ -321,9 +321,9 @@ fig5 <- ggplot(rmse_fig, aes(x = feature_set, y = rmse_dev,
     plot.margin         = margin(6, 10, 6, 6)
   )
 
-save_fig(fig5, "fig_05_model_comparison", width = 10, height = 10)
+save_fig(fig3, "fig_03_model_comparison", width = 10, height = 10)
 
-fig6 <- make_outcome_figure(
+fig4 <- make_outcome_figure(
   outcome_name       = "choice_prop",
   sesoi              = 0.025,
   n_top_interactions = 8,
@@ -334,10 +334,10 @@ fig6 <- make_outcome_figure(
   fig_tag_A          = "A",
   fig_tag_B          = "B"
 )
-save_fig(fig6, "fig_06_choice_prop", width = 13, height = 8.5)
+save_fig(fig4, "fig_04_choice_prop", width = 13, height = 8.5)
 
 
-fig7 <- make_outcome_figure(
+fig5 <- make_outcome_figure(
   outcome_name       = "alcbias",
   sesoi              = NULL,
   n_top_interactions = 8,
@@ -348,7 +348,7 @@ fig7 <- make_outcome_figure(
   fig_tag_A          = "A",
   fig_tag_B          = "B"
 )
-save_fig(fig7, "fig_07_alcbias", width = 13, height = 8.5)
+save_fig(fig5, "fig_05_alcbias", width = 13, height = 8.5)
 
 forest_outcomes <- c("choice_prop", "alcbias")
 
@@ -443,8 +443,8 @@ if (length(pos_scales) > 0) {
   pB_f8 <- pB_f8 + ggh4x::facetted_pos_scales(y = pos_scales)
 }
 
-fig8 <- pA_f8 / pB_f8 + plot_layout(heights = c(1, 1.25))
-save_fig(fig8, "fig_08_forest", width = 11, height = 13)
+figs3 <- pA_f8 / pB_f8 + plot_layout(heights = c(1, 1.25))
+save_fig(figs3, "fig_s03_forest", width = 11, height = 13)
 
 
 
@@ -616,4 +616,4 @@ heat <- ggplot(heatmap_dat,
     plot.margin      = margin(8, 12, 8, 8)
   )
 
-save_fig(heat, "fig_09_consistency_heatmap", width = 13.5, height = 6)
+save_fig(heat, "fig_06_consistency_heatmap", width = 13.5, height = 6)
