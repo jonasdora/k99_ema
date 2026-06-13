@@ -16,3 +16,4 @@ data.csv
 *.docx
 Rplot.pdf
 k99_ema_prereg_code.r
+raw_data/
